@@ -105,6 +105,23 @@ module ChangefeedPosition =
 
 
 
+[<RequireQualifiedAccess>]
+/// A PartitionSelector is a function that filters a list of CosmosDB partitions into ones that a single processor will handle
+module PartitionSelectors =
+  /// A PartitionSelector is a function that filters a list of CosmosDB partitions into ones that a single processor will handle
+  type PartitionSelector = PartitionKeyRange[] -> PartitionKeyRange[]
+
+  /// An identity partition selector. It returns all given partitions
+  let allPartitions : PartitionSelector = id
+
+  /// A partition selector that attempts to split the partitions across `totalProcessors`.
+  /// The ChangefeedProcessor gets assigned every nth partition to process.
+  let evenSplit totalProcessors n : PartitionSelector =
+    fun allPartitions ->
+      allPartitions
+      |> Array.sortBy (fun pkr -> pkr.GetPropertyValue "minInclusive" |> RangePosition.rangeToInt64)
+      |> Array.mapi (fun i pkr -> if i % totalProcessors = n then Some pkr else None)
+      |> Array.choose id
 
 
 
@@ -178,7 +195,8 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
 /// - `progressHandler`: is an asynchronous function ('a list * ChangefeedPosition) -> Async<unit>
 ///    that is called periodically with a list of outputs that were produced by the handle function since the
 ///    last invocation and the current position of the changefeedprocessor.
-let go (cosmos:CosmosEndpoint) (config:Config) handle progressHandler = async {
+/// - `partitionSelector`: is a filtering function `PartitionKeyRange[] -> PartitionKeyRange` that is used to narrow down the list of partitions to process.
+let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector) handle progressHandler = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
     client = client
@@ -236,6 +254,7 @@ let go (cosmos:CosmosEndpoint) (config:Config) handle progressHandler = async {
   let! partitions = getPartitions state
   let workers =
     partitions
+    |> partitionSelector
     |> Array.map ((fun pkr -> readPartition config state pkr) >> AsyncSeq.iterAsync handle)
     |> Async.Parallel
     |> Async.Ignore
