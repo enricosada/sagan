@@ -1,3 +1,6 @@
+### 0.0.10
+* Added partition filtering for changefeed processor
+
 ### 0.0.9
 * Added a retry delay for querying a partition when the changefeed processor reaches the tail of that partition.
 
