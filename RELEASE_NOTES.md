@@ -1,4 +1,4 @@
-### 0.0.11
+### 0.0.11-alpha
 * Fixed issue with out of memory, now changefeed api require a merge function
 
 ### 0.0.10
