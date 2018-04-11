@@ -1,3 +1,6 @@
+### 0.0.11
+* Fixed issue with out of memory, now changefeed api require a merge function
+
 ### 0.0.10
 * Added partition filtering for changefeed processor
 
