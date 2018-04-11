@@ -1,13 +1,5 @@
-#I "bin/Debug"
-
-#r "Newtonsoft.Json"
-#r "Microsoft.Azure.Documents.Client"
-#r "FSharp.Control.AsyncSeq"
-
-#load "Prelude.fs"
-#load "Reactor.fs"
-#load "ChangefeedProcessor.fs"
-
+﻿// Learn more about F# at http://fsharp.org
+// See the 'F# Tutorial' project for more help.
 
 open System
 open Microsoft.Azure.Documents
@@ -25,10 +17,10 @@ let prog (length:int, changefeedPosition) = async {
 }
 
 let endpoint : CosmosEndpoint = {
-  uri = Uri "https://[YOUR ACCOUNT].documents.azure.com:443/"
-  authKey = "[YOUR AUTH KEY]"
-  databaseName = "[DB NAME]"
-  collectionName = "[COLLECTION NAME]"
+  uri = Uri "https://qa-incredibles-equinox.documents.azure.com:443/"
+  authKey = "HNh9XsGeUyuoZpxTZy9r1DqHOG8UuGsXBxDwJqy5RV2CF2dmZLiUGSQT0RE3YpyZu3R6kYYjUXdqelNteNy5tQ=="
+  databaseName = "qa-incredibles-equinox"
+  collectionName = "incredibles"
 }
 
 let config : Config = {
@@ -43,5 +35,8 @@ let merge (input:int*int) : int =
     let a,b = input
     a + b
 
-go endpoint config PartitionSelectors.allPartitions handler prog merge
-|> Async.RunSynchronously
+[<EntryPoint>]
+let main argv = 
+    go endpoint config PartitionSelectors.allPartitions handler prog merge
+    |> Async.RunSynchronously
+    0 // return an integer exit code
