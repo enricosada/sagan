@@ -11,19 +11,16 @@ let handler (docs,range) = async {
   return Array.length docs
 }
 
-let prog (length:int option, changefeedPosition) = async {
-  match length with
-  | None -> printfn "---No document processed---"
-  | Some length ->
-      printfn "---Progress Tracker---processed %O documents---" length
-      printfn "~~~~Changefeed Position~~~~\n%A\n~~~~" changefeedPosition
+let prog (length:int, changefeedPosition) = async {
+  printfn "---Progress Tracker---processed %O documents---" length
+  printfn "~~~~Changefeed Position~~~~\n%A\n~~~~" changefeedPosition
 }
 
 let endpoint : CosmosEndpoint = {
-  uri = Uri "https://qa-incredibles-equinox.documents.azure.com:443/"
-  authKey = "HNh9XsGeUyuoZpxTZy9r1DqHOG8UuGsXBxDwJqy5RV2CF2dmZLiUGSQT0RE3YpyZu3R6kYYjUXdqelNteNy5tQ=="
-  databaseName = "qa-incredibles-equinox"
-  collectionName = "incredibles"
+  uri = Uri "https://[YOUR ACCOUNT].documents.azure.com:443/"
+  authKey = "[YOUR AUTH KEY]"
+  databaseName = "[DB NAME]"
+  collectionName = "[COLLECTION NAME]"
 }
 
 let config : Config = {
@@ -34,13 +31,9 @@ let config : Config = {
   StoppingPosition = None
 }
 
-let merge (input:int option*int option) : int option=
+let merge (input:int*int) : int =
     let a,b = input
-    match a,b with
-    | None,None -> None
-    | Some a, None -> Some a
-    | None, Some b -> Some b
-    | Some a, Some b -> Some (a + b)
+    a + b
 
 [<EntryPoint>]
 let main argv = 

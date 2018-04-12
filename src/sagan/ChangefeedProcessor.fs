@@ -237,20 +237,8 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   // updates changefeed position and add the new element to the list of outputs
   let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =    
     merge (output,(Some handlerOutput)) , (updateChangefeedPosition cfp pp)
-
-   // converts a buffered list of handler output to a flat list of outputs and an updated changefeed position
-  let flatten (x: ('a option * ChangefeedPosition) []) : 'a option * ChangefeedPosition = 
-    match x.Length with
-    | 0 -> None,[||]
-    | _ ->
-        let out = (x.[x.Length-1]) |> fst
-        let flattenPartitionPositions (cfps:ChangefeedPosition[]) = cfps |> Array.tryLast |> Option.getValueOr [||]
-        let pos =
-            x
-            |> Array.unzip
-            |> snd
-            |> flattenPartitionPositions
-        out,pos
+    
+  let stateFlatten state out = out
 
   // used to accumulate the output of all the user handle functions
   let progressReactor = Reactor.mk
@@ -264,8 +252,8 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
     progressReactor
     |> Reactor.recv
     |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,[||])
-    |> AsyncSeq.bufferByTime (int config.ProgressInterval.TotalMilliseconds) //maybe add AsyncSeq.bufferByTimeFold that only holds latest state
-    |> AsyncSeq.iterAsync (flatten >> reactorProgressHandler)
+    |> AsyncSeq.bufferByTimeFold (int config.ProgressInterval.TotalMilliseconds) stateFlatten (None,[||])
+    |> AsyncSeq.iterAsync reactorProgressHandler
     |> Async.StartChild
 
 
