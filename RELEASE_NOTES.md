@@ -1,3 +1,6 @@
+### 0.0.11.1-alpha
+* Fixed issue with AsyncSeq accumulator array aggregation, now only tracks latest state.
+
 ### 0.0.11-alpha
 * Fixed issue with out of memory, now changefeed api require a merge function
 
