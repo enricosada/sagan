@@ -198,7 +198,7 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
 ///    last invocation and the current position of the changefeedprocessor.
 /// - `partitionSelector`: is a filtering function `PartitionKeyRange[] -> PartitionKeyRange` that is used to narrow down the list of partitions to process.
 let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector) 
-    (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a * ChangefeedPosition -> Async<Unit>) (outputMerge:'a*'a -> 'a) = async {
+    (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a option * ChangefeedPosition -> Async<Unit>) (outputMerge:'a option*'a option -> 'a option) = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
     client = client
@@ -221,23 +221,22 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
       newCfp
 
   // updates changefeed position and add the new element to the list of outputs
-  let accumPartitionsPositions (merge: 'a*'a -> 'a) (output:'a list, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =
-    let handleOut =
-        match output.Length with 
-        | 0 -> handlerOutput
-        | _ -> merge (output.Head,handlerOutput)
-    [handleOut] , (updateChangefeedPosition cfp pp)
+  let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =    
+    merge (output,(Some handlerOutput)) , (updateChangefeedPosition cfp pp)
 
    // converts a buffered list of handler output to a flat list of outputs and an updated changefeed position
-  let flatten (x: ('a list * ChangefeedPosition) []) : 'a * ChangefeedPosition = 
-    let out = (x.[x.Length-1]) |> fst |> List.head
-    let flattenPartitionPositions (cfps:ChangefeedPosition[]) = cfps |> Array.tryLast |> Option.getValueOr [||]
-    let pos =
-        x
-        |> Array.unzip
-        |> snd
-        |> flattenPartitionPositions
-    out,pos
+  let flatten (x: ('a option * ChangefeedPosition) []) : 'a option * ChangefeedPosition = 
+    match x.Length with
+    | 0 -> None,[||]
+    | _ ->
+        let out = (x.[x.Length-1]) |> fst
+        let flattenPartitionPositions (cfps:ChangefeedPosition[]) = cfps |> Array.tryLast |> Option.getValueOr [||]
+        let pos =
+            x
+            |> Array.unzip
+            |> snd
+            |> flattenPartitionPositions
+        out,pos
 
   // used to accumulate the output of all the user handle functions
   let progressReactor = Reactor.mk
@@ -250,7 +249,7 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   let! progressTracker =
     progressReactor
     |> Reactor.recv
-    |> AsyncSeq.scan (accumPartitionsPositions outputMerge) ([],[||])
+    |> AsyncSeq.scan (accumPartitionsPositions outputMerge) (None,[||])
     |> AsyncSeq.bufferByTime (int config.ProgressInterval.TotalMilliseconds)
     |> AsyncSeq.iterAsync (flatten >> progressHandler)
     |> Async.StartChild
