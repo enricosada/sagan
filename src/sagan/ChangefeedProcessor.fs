@@ -198,7 +198,7 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
 ///    last invocation and the current position of the changefeedprocessor.
 /// - `partitionSelector`: is a filtering function `PartitionKeyRange[] -> PartitionKeyRange` that is used to narrow down the list of partitions to process.
 let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector) 
-    (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a option * ChangefeedPosition -> Async<Unit>) (outputMerge:'a option*'a option -> 'a option) = async {
+    (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a * ChangefeedPosition -> Async<Unit>) (outputMerge:'a*'a -> 'a) = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
     client = client
@@ -219,6 +219,20 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
         newCfp.[i] <- cfp.[i]
       newCfp.[cfp.Length] <- rp
       newCfp
+      
+  // wraps around the user's merge function with option type for AsyncSeq scan
+  let optionMerge (input:'a option*'a option) : 'a option = 
+    match input with
+    | None, None -> None
+    | Some a, None -> Some a
+    | None, Some b -> Some b
+    | Some a, Some b -> (a,b) |> outputMerge |> Some
+
+  // wraps around user's progressHandler function to only excute when a exists
+  let reactorProgressHandler ((a,cf): 'a option*ChangefeedPosition) : Async<Unit> = async {
+    match a with 
+    | None -> ()
+    | Some a -> do! progressHandler (a,cf) }
 
   // updates changefeed position and add the new element to the list of outputs
   let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =    
@@ -249,9 +263,9 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   let! progressTracker =
     progressReactor
     |> Reactor.recv
-    |> AsyncSeq.scan (accumPartitionsPositions outputMerge) (None,[||])
-    |> AsyncSeq.bufferByTime (int config.ProgressInterval.TotalMilliseconds)
-    |> AsyncSeq.iterAsync (flatten >> progressHandler)
+    |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,[||])
+    |> AsyncSeq.bufferByTime (int config.ProgressInterval.TotalMilliseconds) //maybe add AsyncSeq.bufferByTimeFold that only holds latest state
+    |> AsyncSeq.iterAsync (flatten >> reactorProgressHandler)
     |> Async.StartChild
 
 
