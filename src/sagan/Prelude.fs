@@ -4,6 +4,7 @@ module internal Sagan.Prelude
 open System
 open System.Threading
 open System.Threading.Tasks
+open FSharp.Control
 
 /// Maps over individual items of a pair.
 let inline mapPair f g (a,b) = (f a, g b)
@@ -90,3 +91,40 @@ type Async with
           cnc ex
       Async.StartThreadPoolWithContinuations (a, ok, err, cnc, cts.Token)
       Async.StartThreadPoolWithContinuations (b, ok, err, cnc, cts.Token)
+  
+  static member internal chooseTasks2 (a:Task<'T>) (b:Task) : Async<Choice<'T * Task, Task<'T>>> =
+    async { 
+        let ta = a :> Task
+        let! i = Task.WhenAny( ta, b ) |> Async.AwaitTask
+        if i = ta then return (Choice1Of2 (a.Result, b))
+        elif i = b then return (Choice2Of2 (a)) 
+        else return! failwith "unreachable" }
+
+module AsyncSeq =
+  let bufferByTimeFold (timeMs:int) (flatten:'State -> 'T -> 'State) (initialState: 'State) (source:AsyncSeq<'T>) : AsyncSeq<'State> = asyncSeq {
+    if (timeMs < 1) then invalidArg "timeMs" "must be positive"
+    let mutable curState = initialState
+    use ie = source.GetEnumerator()
+    let rec loop (next:Task<'T option> option, waitFor:Task option) = asyncSeq {
+      let! next = 
+        match next with
+        | Some n -> async.Return n
+        | None -> ie.MoveNext () |> Async.StartChildAsTask
+      let waitFor = 
+        match waitFor with
+        | Some w -> w
+        | None -> Task.Delay timeMs
+      let! res = Async.chooseTasks2 next waitFor
+      match res with      
+      | Choice1Of2 (Some a,waitFor) ->
+        curState <- flatten curState a
+        yield! loop (None,Some waitFor)      
+      // reached the end of seq
+      | Choice1Of2 (None,_) ->
+          yield curState
+      // time has expired
+      | Choice2Of2 next ->
+        yield curState
+        curState <- initialState
+        yield! loop (Some next, None) }
+    yield! loop (None, None) }  

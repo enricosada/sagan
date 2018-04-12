@@ -1,13 +1,5 @@
-#I "bin/Debug"
-
-#r "Newtonsoft.Json"
-#r "Microsoft.Azure.Documents.Client"
-#r "FSharp.Control.AsyncSeq"
-
-#load "Prelude.fs"
-#load "Reactor.fs"
-#load "ChangefeedProcessor.fs"
-
+﻿// Learn more about F# at http://fsharp.org
+// See the 'F# Tutorial' project for more help.
 
 open System
 open Microsoft.Azure.Documents
@@ -43,5 +35,8 @@ let merge (input:int*int) : int =
     let a,b = input
     a + b
 
-go endpoint config PartitionSelectors.allPartitions handler prog merge
-|> Async.RunSynchronously
+[<EntryPoint>]
+let main argv = 
+    go endpoint config PartitionSelectors.allPartitions handler prog merge
+    |> Async.RunSynchronously
+    0 // return an integer exit code

@@ -192,11 +192,13 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
 
 /// Returns an async computation that runs a concurrent (per-docdb-partition) changefeed processor.
 /// - `handle`: is an asynchronous function that takes a batch of documents and returns a result
-/// - `progressHandler`: is an asynchronous function ('a list * ChangefeedPosition) -> Async<unit>
+/// - `progressHandler`: is an asynchronous function ('a * ChangefeedPosition) -> Async<unit>
+/// - `outputMerge` : is a merge function that merges the output result 'a -> 'a -> 'a
 ///    that is called periodically with a list of outputs that were produced by the handle function since the
 ///    last invocation and the current position of the changefeedprocessor.
 /// - `partitionSelector`: is a filtering function `PartitionKeyRange[] -> PartitionKeyRange` that is used to narrow down the list of partitions to process.
-let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector) handle progressHandler = async {
+let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector) 
+    (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a * ChangefeedPosition -> Async<Unit>) (outputMerge:'a*'a -> 'a) = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
     client = client
@@ -217,22 +219,27 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
         newCfp.[i] <- cfp.[i]
       newCfp.[cfp.Length] <- rp
       newCfp
+      
+  // wraps around the user's merge function with option type for AsyncSeq scan
+  let optionMerge (input:'a option*'a option) : 'a option = 
+    match input with
+    | None, None -> None
+    | Some a, None -> Some a
+    | None, Some b -> Some b
+    | Some a, Some b -> (a,b) |> outputMerge |> Some
+
+  // wraps around user's progressHandler function to only excute when a exists
+  let reactorProgressHandler ((a,cf): 'a option*ChangefeedPosition) : Async<Unit> = async {
+    match a with 
+    | None -> ()
+    | Some a -> do! progressHandler (a,cf) }
 
   // updates changefeed position and add the new element to the list of outputs
-  let accumPartitionsPositions (outputs:'a list, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =
-    (handlerOutput::outputs) , (updateChangefeedPosition cfp pp)
-
-  // converts a buffered list of handler output to a flat list of outputs and an updated changefeed position
-  let flatten (x: ('a list * ChangefeedPosition) []) : 'a list * ChangefeedPosition =
-    let flattenOutputs os =
-      Seq.collect id os
-      |> Seq.toList
-      |> List.rev
-    let flattenPartitionPositions (cfps:ChangefeedPosition[]) = cfps |> Array.tryLast |> Option.getValueOr [||]
-    x
-    |> Array.unzip
-    |> mapPair flattenOutputs flattenPartitionPositions
-
+  let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =    
+    merge (output,(Some handlerOutput)) , (updateChangefeedPosition cfp pp)
+    
+  //basically always takes the latter one (renew state)
+  let stateFlatten _ out = out
 
   // used to accumulate the output of all the user handle functions
   let progressReactor = Reactor.mk
@@ -245,9 +252,9 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   let! progressTracker =
     progressReactor
     |> Reactor.recv
-    |> AsyncSeq.scan accumPartitionsPositions ([],[||])
-    |> AsyncSeq.bufferByTime (int config.ProgressInterval.TotalMilliseconds)
-    |> AsyncSeq.iterAsync (flatten >> progressHandler)
+    |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,[||])
+    |> AsyncSeq.bufferByTimeFold (int config.ProgressInterval.TotalMilliseconds) stateFlatten (None,[||])
+    |> AsyncSeq.iterAsync reactorProgressHandler
     |> Async.StartChild
 
 
