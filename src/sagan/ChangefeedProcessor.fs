@@ -238,7 +238,8 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =    
     merge (output,(Some handlerOutput)) , (updateChangefeedPosition cfp pp)
     
-  let stateFlatten state out = out
+  //basically always takes the latter one (renew state)
+  let stateFlatten _ out = out
 
   // used to accumulate the output of all the user handle functions
   let progressReactor = Reactor.mk
