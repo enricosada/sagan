@@ -8,6 +8,7 @@ open Microsoft.Azure.Documents.Client
 
 open FSharp.Control
 
+open Prelude.AsyncExtensions
 
 type CosmosEndpoint = {
   uri : Uri
@@ -47,7 +48,6 @@ and StartingPosition =
   | Beginning
   | ChangefeedPosition of ChangefeedPosition
 
-
 type private State = {
   /// The client used to communicate with DocumentDB
   client : DocumentClient
@@ -55,8 +55,6 @@ type private State = {
   /// URI of the collection being processed
   collectionUri : Uri
 }
-
-
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module RangePosition =
@@ -82,8 +80,6 @@ module RangePosition =
     | true, i -> i
     | false, _ -> 0L
 
-
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ChangefeedPosition =
   let fstSucceedsSnd (cfp1:ChangefeedPosition) (cfp2:ChangefeedPosition) =
@@ -103,8 +99,6 @@ module ChangefeedPosition =
   let tryGetPartitionByRange min max (cfp:ChangefeedPosition) =
     cfp |> Array.tryFind (fun rp -> RangePosition.rangeCoversMinMax rp min max)
 
-
-
 [<RequireQualifiedAccess>]
 /// A PartitionSelector is a function that filters a list of CosmosDB partitions into ones that a single processor will handle
 module PartitionSelectors =
@@ -123,15 +117,12 @@ module PartitionSelectors =
       |> Array.mapi (fun i pkr -> if i % totalProcessors = n then Some pkr else None)
       |> Array.choose id
 
-
-
 /// Returns the current set of partitions in docdb changefeed
 let private getPartitions (st:State) = async {
   // TODO: set FeedOptions properly. Needed for resuming from a changefeed position
   let! response = st.client.ReadPartitionKeyRangeFeedAsync st.collectionUri |> Async.AwaitTaskCorrect
   return response.ToArray()
 }
-
 
 /// Reads a partition of the changefeed and returns an AsyncSeq<Document[] * RangePosition>
 ///   - Document[] is a batch of documents read from changefeed
@@ -189,7 +180,6 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
   | Some stopLSN when startLSN >= stopLSN -> AsyncSeq.empty
   | _ -> readPartition query pkr
 
-
 /// Returns an async computation that runs a concurrent (per-docdb-partition) changefeed processor.
 /// - `handle`: is an asynchronous function that takes a batch of documents and returns a result
 /// - `progressHandler`: is an asynchronous function ('a * ChangefeedPosition) -> Async<unit>
@@ -197,7 +187,7 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
 ///    that is called periodically with a list of outputs that were produced by the handle function since the
 ///    last invocation and the current position of the changefeedprocessor.
 /// - `partitionSelector`: is a filtering function `PartitionKeyRange[] -> PartitionKeyRange` that is used to narrow down the list of partitions to process.
-let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector) 
+let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector)
     (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a * ChangefeedPosition -> Async<Unit>) (outputMerge:'a*'a -> 'a) = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
@@ -219,9 +209,9 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
         newCfp.[i] <- cfp.[i]
       newCfp.[cfp.Length] <- rp
       newCfp
-      
+
   // wraps around the user's merge function with option type for AsyncSeq scan
-  let optionMerge (input:'a option*'a option) : 'a option = 
+  let optionMerge (input:'a option*'a option) : 'a option =
     match input with
     | None, None -> None
     | Some a, None -> Some a
@@ -230,14 +220,14 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
 
   // wraps around user's progressHandler function to only excute when a exists
   let reactorProgressHandler ((a,cf): 'a option*ChangefeedPosition) : Async<Unit> = async {
-    match a with 
+    match a with
     | None -> ()
     | Some a -> do! progressHandler (a,cf) }
 
   // updates changefeed position and add the new element to the list of outputs
-  let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =    
+  let accumPartitionsPositions (merge: 'a option*'a option -> 'a option) (output:'a option, cfp:ChangefeedPosition) (handlerOutput: 'a, pp:RangePosition) =
     merge (output,(Some handlerOutput)) , (updateChangefeedPosition cfp pp)
-    
+
   //basically always takes the latter one (renew state)
   let stateFlatten _ out = out
 
@@ -257,7 +247,6 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
     |> AsyncSeq.iterAsync reactorProgressHandler
     |> Async.StartChild
 
-
   let! partitions = getPartitions state
   let workers =
     partitions
@@ -269,7 +258,6 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   return! Async.choose progressTracker workers
 }
 
-
 /// Periodically queries DocDB for the latest positions of all partitions in its changefeed.
 /// The `handler` function will be called periodically, once per `interval`, with an updated ChangefeedPosition.
 let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateTime*ChangefeedPosition -> Async<unit>) = async {
@@ -280,7 +268,7 @@ let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateT
   }
 
   let getRecentPosition (pkr:PartitionKeyRange) = async {
-    let cfo = ChangeFeedOptions(PartitionKeyRangeId = pkr.Id, StartTime = Nullable DateTime.Now)
+    let cfo = ChangeFeedOptions(PartitionKeyRangeId = pkr.Id, StartTime = Nullable (DateTime.Now.AddHours(1.)))
     let query = client.CreateDocumentChangeFeedQuery(state.collectionUri, cfo)
     let! response = query.ExecuteNextAsync<Document>() |> Async.AwaitTask
     let rp : RangePosition = {
@@ -290,6 +278,14 @@ let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateT
     }
     return rp
   }
+
+  let getRecentPosition pkr =
+    getRecentPosition pkr
+    |> Async.timeoutAfter (TimeSpan.FromSeconds(3.)) // times out after 3 seconds, shouldnt take more than 1
+
+  let handler input =
+    handler input
+    |> Async.timeoutAfter (TimeSpan.FromTicks(interval.Ticks * 3L))
 
   let! partitions = getPartitions state   // NOTE: partitions will only be fetched once. Consider moving this inside the query function in case of a docdb partition split.
   let queryPartitions dateTime = async {
