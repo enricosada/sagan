@@ -9,11 +9,9 @@ open FSharp.Control
 /// Maps over individual items of a pair.
 let inline mapPair f g (a,b) = (f a, g b)
 
-
 module Option =
   /// Given a default value and an option, returns the option value if there else the default value.
   let inline getValueOr defaultValue = function Some v -> v | None -> defaultValue
-
 
 module Array =
   let tryLast arr =
@@ -21,12 +19,9 @@ module Array =
     if len > 0 then Some arr.[len-1]
     else None
 
-
 module List =
   /// Prepend element to list.
   let inline cons x xs = x::xs
-
-
 
 type Mb<'a> = MailboxProcessor<'a>
 
@@ -41,8 +36,6 @@ module Mb =
 
   /// Creates an async computation that completes when a message is available in a mailbox.
   let inline take (mb:Mb<'a>) = mb.Receive ()
-
-
 
 type Async with
   static member inline bind (f:'a -> Async<'b>) (a:Async<'a>) : Async<'b> = async.Bind(a, f)
@@ -91,13 +84,13 @@ type Async with
           cnc ex
       Async.StartThreadPoolWithContinuations (a, ok, err, cnc, cts.Token)
       Async.StartThreadPoolWithContinuations (b, ok, err, cnc, cts.Token)
-  
+
   static member internal chooseTasks2 (a:Task<'T>) (b:Task) : Async<Choice<'T * Task, Task<'T>>> =
-    async { 
+    async {
         let ta = a :> Task
         let! i = Task.WhenAny( ta, b ) |> Async.AwaitTask
         if i = ta then return (Choice1Of2 (a.Result, b))
-        elif i = b then return (Choice2Of2 (a)) 
+        elif i = b then return (Choice2Of2 (a))
         else return! failwith "unreachable" }
 
 module AsyncSeq =
@@ -106,19 +99,19 @@ module AsyncSeq =
     let mutable curState = initialState
     use ie = source.GetEnumerator()
     let rec loop (next:Task<'T option> option, waitFor:Task option) = asyncSeq {
-      let! next = 
+      let! next =
         match next with
         | Some n -> async.Return n
         | None -> ie.MoveNext () |> Async.StartChildAsTask
-      let waitFor = 
+      let waitFor =
         match waitFor with
         | Some w -> w
         | None -> Task.Delay timeMs
       let! res = Async.chooseTasks2 next waitFor
-      match res with      
+      match res with
       | Choice1Of2 (Some a,waitFor) ->
         curState <- flatten curState a
-        yield! loop (None,Some waitFor)      
+        yield! loop (None,Some waitFor)
       // reached the end of seq
       | Choice1Of2 (None,_) ->
           yield curState
@@ -127,4 +120,12 @@ module AsyncSeq =
         yield curState
         curState <- initialState
         yield! loop (Some next, None) }
-    yield! loop (None, None) }  
+    yield! loop (None, None) }
+
+module AsyncExtensions =
+  type Async with
+    /// Returns an async computation which runs the argument computation but raises an exception if it doesn't complete
+    /// by the specified timeout.
+    static member timeoutAfter (timeout:TimeSpan) (c:Async<'a>) = async {
+        let! r = Async.StartChild(c, (int)timeout.TotalMilliseconds)
+        return! r }
