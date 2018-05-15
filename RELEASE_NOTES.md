@@ -1,3 +1,6 @@
+### 0.0.11.2-alpha
+* Added timeout to trail tracking changefeed request as well as handler to prevent hanging.
+
 ### 0.0.11.1-alpha
 * Fixed issue with AsyncSeq accumulator array aggregation, now only tracks latest state.
 
