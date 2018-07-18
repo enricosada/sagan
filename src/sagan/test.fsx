@@ -1,4 +1,4 @@
-#I "bin/Debug"
+#I "bin/Debug/net45"
 
 #r "Newtonsoft.Json"
 #r "Microsoft.Azure.Documents.Client"
