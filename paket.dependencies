@@ -1,5 +1,6 @@
 source https://api.nuget.org/v3/index.json
 
+nuget FSharp.Core >= 4.3.4
 nuget FSharp.Control.AsyncSeq >= 2.0.16
 nuget Microsoft.Azure.DocumentDB >= 1.17
 
