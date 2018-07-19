@@ -94,13 +94,11 @@ Target "CleanDocs" (fun _ ->
 // Build library & test project
 
 Target "Build" (fun _ ->
-    !! solutionFile
-#if MONO
-    |> MSBuildReleaseExt "" [ ("DefineConstants","MONO") ] "Rebuild"
-#else
-    |> MSBuildRelease "" "Rebuild"
-#endif
-    |> ignore
+    DotNetCli.Build
+        (fun p -> 
+           { p with
+                Project = solutionFile
+                Configuration = "Release" })
 )
 
 #if MONO
