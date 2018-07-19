@@ -20,7 +20,7 @@ group Build
   framework: net461
 
   nuget SourceLink.Fake
-  nuget FAKE
+  nuget FAKE ~> 4
   nuget FSharp.Formatting
 
   github fsharp/FAKE modules/Octokit/Octokit.fsx
