@@ -1,3 +1,6 @@
+### 0.0.12-alpha
+* Support .NET Standard 2.0
+
 ### 0.0.11.2-alpha
 * Added timeout to trail tracking changefeed request as well as handler to prevent hanging.
 
