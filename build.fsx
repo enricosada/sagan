@@ -100,11 +100,11 @@ Target "Build" (fun _ ->
 // Build a NuGet package
 
 Target "NuGet" (fun _ ->
-    Paket.Pack(fun p ->
+    DotNetCli.Pack(fun p ->
         { p with
-            OutputPath = "bin"
-            Version = release.NugetVersion
-            ReleaseNotes = toLines release.Notes})
+            Project = "src/sagan/sagan.fsproj"
+            OutputPath = __SOURCE_DIRECTORY__ </> "bin"
+            AdditionalArgs = [ sprintf "/p:Version=%s" release.NugetVersion ] })
 )
 
 Target "PublishNuget" (fun _ ->

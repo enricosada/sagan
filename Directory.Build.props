@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Authors>Jet.com</Authors>
+    <PackageProjectUrl>http://github.com/jet/sagan</PackageProjectUrl>
+    <PackageTags>cosmos</PackageTags>
+    <Description>F# client for Cosmos DB</Description>
+    <RepositoryUrl>https://github.com/jet/sagan.git</RepositoryUrl>
+    <PackageLicenseUrl>http://github.com/jet/sagan/blob/master/LICENSE.txt</PackageLicenseUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/jet/kafunk/master/docs/files/img/logo.png</PackageIconUrl>
+  </PropertyGroup>
+</Project>
