@@ -94,7 +94,9 @@ Target "NuGet" (fun _ ->
         { p with
             Project = "src/sagan/sagan.fsproj"
             OutputPath = __SOURCE_DIRECTORY__ </> "bin"
-            AdditionalArgs = [ sprintf "/p:Version=%s" release.NugetVersion ] })
+            AdditionalArgs =
+                [ sprintf "/p:Version=%s" release.NugetVersion
+                  sprintf "\"/p:PackageReleaseNotes=%s\"" (toLines release.Notes) ] })
 )
 
 Target "PublishNuget" (fun _ ->
