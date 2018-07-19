@@ -21,7 +21,6 @@ NUGET
     FSharpVSPowerTools.Core (2.3)
       FSharp.Compiler.Service (>= 2.0.0.3)
     Octokit (0.28)
-    SourceLink.Fake (1.1)
 GITHUB
   remote: fsharp/FAKE
     modules/Octokit/Octokit.fsx (3faee4d67108fff561b7c400e5343901495b8e63)

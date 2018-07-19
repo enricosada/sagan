@@ -19,7 +19,6 @@ group Build
   source https://api.nuget.org/v3/index.json
   framework: net461
 
-  nuget SourceLink.Fake
   nuget FAKE ~> 4
   nuget FSharp.Formatting
 
