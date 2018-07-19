@@ -103,15 +103,6 @@ Target "Build" (fun _ ->
     |> ignore
 )
 
-// --------------------------------------------------------------------------------------
-// Run the unit tests using test runner
-
-Target "RunTests" (fun _ ->
-    !! testAssemblies
-    |> NUnit3 (fun p ->
-        { p with TimeOut = TimeSpan.FromMinutes 20.})
-)
-
 #if MONO
 #else
 // --------------------------------------------------------------------------------------
