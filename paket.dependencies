@@ -23,3 +23,9 @@ group Build
   nuget FSharp.Formatting
 
   github fsharp/FAKE modules/Octokit/Octokit.fsx
+
+group SourceLink
+  source https://api.nuget.org/v3/index.json
+  storage: none
+
+  nuget SourceLink.Create.CommandLine ~> 2 copy_local: true

@@ -83,7 +83,8 @@ Target "Build" (fun _ ->
         (fun p -> 
            { p with
                 Project = solutionFile
-                Configuration = "Release" })
+                Configuration = "Release"
+                AdditionalArgs = [ "/p:SourceLinkCreate=true" ] })
 )
 
 // --------------------------------------------------------------------------------------
