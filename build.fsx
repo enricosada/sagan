@@ -64,16 +64,6 @@ let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/jet"
 // Read additional information from the release notes document
 let release = LoadReleaseNotes "RELEASE_NOTES.md"
 
-// Copies binaries from default VS location to expected bin folder
-// But keeps a subdirectory structure for each project in the
-// src folder to support multiple project outputs
-Target "CopyBinaries" (fun _ ->
-    !! "src/**/*.??proj"
-    -- "src/**/*.shproj"
-    |>  Seq.map (fun f -> ((System.IO.Path.GetDirectoryName f) </> "bin/Release", "bin" </> (System.IO.Path.GetFileNameWithoutExtension f)))
-    |>  Seq.iter (fun (fromDir, toDir) -> CopyDir toDir fromDir (fun _ -> true))
-)
-
 // --------------------------------------------------------------------------------------
 // Clean build results
 
@@ -301,14 +291,10 @@ Target "All" DoNothing
 
 "Clean"
   ==> "Build"
-  ==> "CopyBinaries"
-  //==> "RunTests"
-  //==> "GenerateReferenceDocs"
-  //==> "GenerateDocs"
   ==> "All"
   =?> ("ReleaseDocs",isLocalBuild)
 
-"CopyBinaries"
+"Build"
   ==> "NuGet"
   ==> "BuildPackage"
 
