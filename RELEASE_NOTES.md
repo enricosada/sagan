@@ -1,3 +1,6 @@
+### 0.0.13-alpha
+* lower FSharp.Core version requirements
+
 ### 0.0.12-alpha
 * Support .NET Standard 2.0
 
