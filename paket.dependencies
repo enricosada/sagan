@@ -1,19 +1,31 @@
 source https://api.nuget.org/v3/index.json
+framework: net45
+storage: none
 
+nuget FSharp.Core >= 4.3.4
 nuget FSharp.Control.AsyncSeq >= 2.0.16
 nuget Microsoft.Azure.DocumentDB >= 1.17
 
+group NetStandard
+  source https://api.nuget.org/v3/index.json
+  framework: netstandard2.0, netcoreapp2.0
+  storage: none
+
+  nuget FSharp.Core >= 4.3.4
+  nuget FSharp.Control.AsyncSeq >= 2.0.16
+  nuget Microsoft.Azure.DocumentDB.Core >= 1.1
+
 group Build
   source https://api.nuget.org/v3/index.json
+  framework: net461
 
-  nuget SourceLink.Fake
-  nuget FAKE
+  nuget FAKE ~> 4
   nuget FSharp.Formatting
 
   github fsharp/FAKE modules/Octokit/Octokit.fsx
 
-group Test
+group SourceLink
   source https://api.nuget.org/v3/index.json
+  storage: none
 
-  nuget NUnit
-  nuget NUnit.Runners
+  nuget SourceLink.Create.CommandLine ~> 2 copy_local: true

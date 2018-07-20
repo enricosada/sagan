@@ -1,2 +1,11 @@
+FSharp.Core
 FSharp.Control.AsyncSeq
 Microsoft.Azure.DocumentDB
+
+group NetStandard
+  FSharp.Core
+  FSharp.Control.AsyncSeq
+  Microsoft.Azure.DocumentDB.Core
+
+group SourceLink
+  SourceLink.Create.CommandLine 
